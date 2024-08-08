@@ -1,0 +1,14 @@
+*.auxlock
+*.aux
+*.lof
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.pdf
+*.bbl
+*.blg
+*.md5
+output
+main.loa
+main.lot

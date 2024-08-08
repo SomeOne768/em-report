@@ -1,0 +1,40 @@
+\section{Architecture}
+
+%technos utilisées
+% Diagramme uml
+%Le commenter
+
+\subsection{Les différents projets}
+
+Notre projet Saint-Nec-Engine est composé de 3 sous-projets différents ayant chacun un but précis:
+\begin{itemize}
+	
+	\item Saint-Nec-Engine-Lib : Librairie contenant l'architecture du moteur.
+	\item Saint-Nec-Engine-Test : Projet contenant tous les tests créés dans le cadre du développement orienté test.
+	\item Saint-Nec-Engine : Projet exécutable de démonstration utilisant la bibliothèque et mettant en scène les différentes fonctionnalités implémentées.
+\end{itemize} 
+
+\subsection{Technologies utilisées}
+
+Pour mener à bien ce projet, nous avons choisi de le développer en \textbf{C\verb!++!} (version 17) car ce langage est l'un des plus utilisé dans le domaine du jeu vidéo. Il est très performant et nous permet d'avoir un management précis de la mémoire (contrairement au Java ou au C\verb|#|). Pour la partie graphique en 3D, nous nous sommes tournés vers \textbf{OpenGL} (version 4.1). Nous l'avons choisi parmi Vulkan ou DirectX car cette bibliothèque est multi-plateforme et possède plus de ressources pour se former. Cependant, elle est considérée comme moins performante de part le fait qu'elle soit ancienne et qu'elle doit fonctionner sur plusieurs plateformes à la fois. Pour créer les différents tests, nous avons utilisé la bibliothèque \textbf{Catch2} car elle est simple à utiliser et fonctionne très bien dans notre cas d'utilisation. Pour compiler nos différents projets nous avons utilisé CMake car il permet une séparation simple des différents projets, est accessibles sur la plupart systèmes d'exploitations et permet d'utiliser chacun un éditeur de code différent selon nos préférences.
+
+
+\subsection{Architecture du moteur}
+ 
+ %Interface simplifiée pour l'utilisateur avec niveau d'avbstraction
+ Nous avons décidé d'utiliser une architecture basée sur un patron de conception composite. C'est un modèle de conception structurelle qui a pour but d'avoir un élément de base que l'on va agrémenter de composants servant diverses fonctionnalités. Dans la \autoref{fig:uml} la classe GameObject représentant un objet est une coquille vide contenant seulement une matrice qui positionne l'objet dans notre monde et une liste de composants. Ces composants peuvent être graphiques (de la géométrie comme un cube ou une sphère) ou physique comme une boite de collision. Par dessus cela, nous avons créé un système simple composé de deux managers. Un servant à gérer les différentes scènes et un autre permettant de gérer toutes les interactions physiques de chaque scène.
+ 
+ \begin{figure}[H]	
+ 	
+ 			
+ 	\centerline{\includegraphics[width=170mm]{Image/uml_svg.pdf}
+
+ 	}
+ 	
+ 	\caption{Diagramme UML du moteur}
+ 	\label{fig:uml}
+ \end{figure}
+ 
+ Cette architecture permet de créer une interface utilisateur au sein de notre bibliothèque permettant à un utilisateur de créer facilement ses scènes avec des objets mais aussi en le laissant créer ses propres composants amenant ainsi plus de fonctionnalités à son propre jeu.
+ 
+ Ce système est plutôt efficace mais repose entièrement sur le principe de programmation orientée objet. Ce principe a pour avantage de pouvoir créer des points d'extension rapidement en utilisant des classes ainsi que des méthodes virtuelles. Cependant, ces méthodes virtuelles ont un coût en termes de performance car la méthode à appeler est identifiée à l'exécution. Une solution à cela serait d'utiliser un \textit{Entity Component System} ou ECS reposant plus le principe de \textit{template}. Celui-ci est moins coûteux en performance à l'exécution car les types sont définis à la compilation.

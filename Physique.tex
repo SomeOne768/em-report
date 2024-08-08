@@ -1,0 +1,445 @@
+\section{Partie physique}
+\subsection{Détection des Collisions}
+Dans le cadre de la détection de collision nous utilisons des formes, relativement simples, qui vont venir englober les différents éléments graphiques qui seront créés. Cela nous permettra non seulement de simplifier les cas d'utilisations et l'implémentation mais aussi et surtout de simplifier les calculs, ce qui évite de surcharger le processeur.\\
+
+Dans notre projet, nous avons décidé d'utiliser 2 formes permettant de gérer des collisions:
+\begin{itemize}[label=-]
+	\item la sphère : caractérisée par son centre et son rayon;
+	\item le parallélépipède rectangle : caractérisé par 8 points ainsi que son centre.
+\end{itemize}
+
+\noindent Ces formes, très simples, permettent une gestion efficace des différentes interactions possible et à moindre coût. Il est à noter que ces formes sont toutes deux \textbf{convexes*}, ce qui est un point important pour les méthodes de détection. Ici nous nous intéresserons à 3 algorithmes différents :
+\begin{itemize}[label=-]
+	\item Axis Aligned Bounding Box (AABB) ou Boîte Englobante Alignée sur les Axes;
+	\item Separating Axis Theorem (SAT) ou Théorème des Axes Séparés;
+	\item l'algorithme de Gilbert–Johnson–Keerthi GJK \citep{GJK2} \cite{GJK1}.
+\end{itemize}
+
+\subsubsection{AABB}
+AABB, ou Boîte Englobante Alignée sur les Axes en français, est une méthode très facile à implémenter et très peu coûteuse en calcul ce qui fait d'elle l'une des plus utilisée pour les petits moteurs de jeux, spécialement en 2D. Pour la détecter s'il y a collision entre 2 objets distincts, AABB va déterminer de manière naïve si les objets se chevauchent à l'aide des valeurs minimales et maximales des projections des différents points sur les axes.\\
+En vérifiant si les coordonnées maximales d'une AABB sont supérieures aux coordonnées minimales de l'autre AABB (et vice versa) sur chaque axe, on peut déterminer si elles se croisent sur cet axe. Si un croisement est détecté sur tous les axes (X, Y et Z), alors il y a potentiellement une collision.
+
+\begin{algorithm}[H]
+	\caption{AABB}
+	\label{Algorithme AABB}
+	\begin{algorithmic}[1]
+		\Require{$X, Y$: objets à tester}
+		\Ensure{Detecte les collisions}\\
+		\For{$chaque$  $axe$}
+		\State $X_{\text{min}} \gets$ valeur minimale sur cet axe parmi les points de X
+		\State $X_{\text{max}} \gets$ valeur maximale sur cet axe parmi les points de X
+		\State $X_{\text{min}} \gets$ valeur minimale sur cet axe parmi les points de Y
+		\State $Y_{\text{max}} \gets$ valeur maximale sur cet axe parmi les points de Y
+		\If{ $X_{\text{max}}$ < $Y_{\text{min}}$ $OR$  $Y_{\text{max}}$ < $X_{\text{min}}$} 
+		\State	return False
+		\EndIf
+		\EndFor
+	
+		\State \textbf{return} True
+	\end{algorithmic}
+\end{algorithm}
+
+\noindent Cependant, cet algorithme a des limites. Il ne tient pas compte des possibles rotations des différents objets et est parfois trop approximatif avec des formes plus complexes (ex: sphère).\\
+
+\noindent\underline{Prenons quelques exemples:}
+\begin{figure}[h!]
+	\begin{minipage}[t!]{0.6\linewidth}
+		Ici, nous avons deux cubes distants dont aucun point ne se chevauchent et il est évident qu'il n'y a pas de collision entre ces deux objets.\\
+		Pour ce cas d'utilisation, AABB est très efficace et économe en calcul.
+	\end{minipage}
+	\hfill 
+	\begin{minipage}[t!]{0.35\linewidth} 
+		\centering
+		\includegraphics[width=\linewidth]{Image/Physique/img1.png}
+		\caption{Cubes distants}
+		\label{fig:Cubes_distant}
+	\end{minipage}
+\end{figure}
+
+\noindent Mais que se passe-t-il si nos cube ne sont pas parfaitement parallèle entre eux ni à l'axe ?\\
+
+\noindent Lorsque des rotations apparaissent, cela devient problématique. Prenons le point supérieur droit du cube le plus à gauche de la figure ci-contre. Nous pouvons clairement voir qu'il n'y a pas de collision à l'aide du deuxième point de vue. Cependant, comme nous basons notre analyse sur les axes X, Y, Z avec AABB, ce point aura un chevauchement sur ces mêmes 3 axes. Cet algorithme nous informera donc de la présence d'une collision alors qu'il n'y en pas.
+
+\begin{figure}[h!]
+	\begin{subfigure}{0.4\linewidth} 
+		\includegraphics[width=\linewidth]{Image/Physique/img2.png}
+		\caption{Cubes avec une rotation}
+		\label{fig:Cubes avec une rotation}
+	\end{subfigure}
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/img3.png}
+		\caption{Cubes avec une rotation vu de face}
+		\label{fig:Cubes avec une rotation vu de face}
+	\end{subfigure}
+	\caption{Cubes AABB}
+	\label{fig:Cubes AABB}
+\end{figure}
+
+
+\pagebreak
+
+\subsubsection{SAT}
+Separating Axis Theorem (SAT) ou Théorème des Axes Séparés en français, est le premier algorithme de détection de collision qui a été implémenté dans notre projet. Reprenant les principes de AABB, celui-ci peut tenir compte des différentes rotations possibles de nos objets. Pour ce faire, au lieu d'utiliser les axes parallèles aux coordonnées X, Y et Z, il va plutôt utiliser les axes spécifiques des objets eux-mêmes. L'algorithme SAT considère les axes qui sont parallèles aux surfaces des objets et permet ainsi une détection plus fine, précise.\\
+
+\underline{\textbf{Théorème:}} Si deux objets n'entrent pas en collision, alors il existe un axe sur lequel la projection de ces deux formes ne se chevauchent pas.
+
+\begin{algorithm}[H]
+	\caption{Algorithme SAT}
+	\label{Algorithm_Projections}
+	\begin{algorithmic}[1]
+		\Require{$X, Y$: objets à tester}
+		\Ensure Détecte les collisions indépendamment de la rotation	
+		\State $axis \gets$ Axis($X$) + Axis($Y$)
+		\For{$axe$ $of$ $axis$}
+		\State $X\_min \gets$ valeur minimale parmi tous les points de X de $produitScalaire(axe, point)$
+		\State $X\_max \gets$ valeur maximale parmi tous les points de X de $produitScalaire(axe, point)$
+		\State $Y\_min \gets$ valeur minimale parmi tous les points de Y de $produitScalaire(axe, point)$
+		\State $Y\_max \gets$ valeur maximale parmi tous les points de Y de $produitScalaire(axe, point)$
+		\If{$X_{\text{max}} < Y_{\text{min}}$ \textbf{OR} $Y_{\text{max}} < X_{\text{min}}$} 
+		\State \textbf{return} False
+		\EndIf
+		
+		\EndFor
+		
+		\State \textbf{return} True
+	\end{algorithmic}
+\end{algorithm}
+\pagebreak
+
+\noindent\underline{Repronons nos exemples:}
+\begin{figure}[h!]
+	\begin{minipage}[t!]{0.6\textwidth} 
+		Pour cet exemple, pas de différence avec AABB. Les axes de chaque cube étant parallèle aux axes X,Y,Z. SAT n'aura pas de problème pour déterminer les collisions et aura un temps de calcul similaire à AABB. Il aura effectivement plus d'axes pour son calcul, cependant 1 seul suffira pour déterminer la présence de collision et mettre fin à l'algorithme.
+	\end{minipage}
+	\hfill 
+	\begin{minipage}[t!]{0.35\textwidth}
+		\centering
+		\includegraphics[width=50mm]{Image/Physique/img1.png}
+		\caption{Cubes distants}
+		\label{fig:Cubes_distant}
+	\end{minipage}
+\end{figure}
+
+
+\begin{figure}[h!]
+	\begin{minipage}[t!]{0.6\textwidth}
+		Maintenant que nous avons des rotations, voyons ce qui se produit.\\
+		
+		\noindent Tout d'abord le premier cube aura des axes parallèles aux axes X,Y,Z et ils seront au nombre de 3. En effet un cube ayant des faces parallèles 2 à 2, cela nous permet de réduire le nombre d'axes à tester et donc de réduire le coût en calcul. Le second en revanche aura toujours 3 axes mais seront spécifiques à son orientation. Il y aura donc au total 6 axes qui seront donc utilisés et observés.\\		
+		
+		Tous comme avec AABB, les axes du premier cube ne permettront pas de prouver qu'il n'y a pas de collision. Mais regardons maintenant les projections sur les 3 autres axes. Nous pouvons clairement voir, à l'aide des projections sur cet axe de +45° qu'il n'y a pas de chevauchement. Il existe donc un axe sur lequel il n'y a pas chevauchement. Par le théorème nous pouvons affirmer qu'il n'y a pas de collision.
+	\end{minipage}
+	\hfill 
+	\begin{minipage}[t!]{0.35\textwidth} 
+		\includegraphics[width=50mm]{Image/Physique/img4.png}
+		\caption{Cubes avec une rotation}
+		\label{fig:Cubes avec une rotation}
+		\includegraphics[width=50mm]{Image/Physique/img5.png}
+		\caption{Cubes avec une rotation vu de face}
+		\label{fig:Cubes avec une rotation vu de face}
+	\end{minipage}
+\end{figure}
+
+\pagebreak
+
+\subsubsection{GJK - introduction}
+L'algorithme de GJK \citep{GJK1, GJK2} est une autre méthode nous permettant de détecter les collisions. Il est un peu plus coûteux que le précédent, cependant il a l'avantage de nous faciliter l'étape suivante qui consistera à résoudre les collisions. Bien que SAT est relativement plus simple et mieux documenté, la résolution qui doit suivre nécessite des informations directement construites par GJK. C'est pourquoi ce dernier l'a finalement remplacé.\\
+Avant d'introduire son fonctionnement, définissons les termes et concepts suivants:
+
+\begin{itemize}[label=$\bullet$]
+	\item la différence de Minkowski qui consiste à faire la différence de 2 ensembles afin d'en construire un nouveau: DM = A $\ominus$ B = \{ a - b $\mid$ a $\in$ A, b $\in$ B \};
+	\item le simplex (ou n-simplex* plus précisément) est une forme qui contiendra au plus n+1 points si nous sommes en dimension n et qui représentera un triangle en 2D ou un tétraèdre en 3D. Celui-ci servira aussi bien pour la détection de collision que la résolution;
+	\item la fonction support qui nous servira à construire ou modifier notre simplex et qui, à l'aide d'un vecteur donné, recherche le point de Minkowski le plus optimal.
+\end{itemize}
+
+\subsubsection{Différence de Minkowski}
+La \textbf{différence de Minkowski (DM)} consiste à faire la différence de 2 ensembles afin d'en construire un nouveau: 
+
+\centerline{DM = A $\ominus$ B = \{ a - b $\mid$ a $\in$ A, b $\in$ B \}}
+\noindent Géométriquement parlant, la différence de Minkowski nous permettra de construire une nouvelle forme qui indiquera si, oui ou non, il y a collision entre 2 objets. En effet, il y a collision \textbf{si et seulement si} cette nouvelle forme contient l'origine. \\
+
+Comme nous pouvons le voir en annexe, lorsque les formes se rapprochent, la DM se rapproche de l'origine jusqu'à finalement la contenir. À l'inverse, lorsque les formes se séparent, les points construits vont s'éloigner de plus en plus de l'origine. On remarquera que le point le plus proche de l'origine est celui construit à partir du point qui est responsable de cette collision. À noter que cela n'est vrai que car dans notre cas, la détection se déclenche assez rapidement lorsqu'elle apparait.\\
+En réalité, lors du déroulement de l'algorithme, nous n'allons pas utiliser tous les points de cette figure mais seulement ses extrémités. Cela nous donnera une forme convexe*, la plus large possible, nous permettant ensuite de rechercher l'origine à l'intérieur de celle-ci.
+
+\subsubsection{Simplex}
+
+Le \textbf{simplex} nous permettra, dans le cadre de la détection de collision, à rechercher et à itérer à travers les points et ainsi définir si l'origine est contenue. Celui-ci sera construit à l'aide d'une fonction \textbf{support} qui va nous permettre, indirectement, non seulement d'obtenir un point appartenant à la différence de Minkowski, mais aussi de rechercher le plus optimal à un instant t pour notre simplex. De cette manière, l'algorithme va non seulement converger plus vite mais aussi détecter plus rapidement l'absence de collision (ce qui est particulièrement important lorsque l'on gère beaucoup d'objets car la grande majorité n'aura pas de collision).
+\pagebreak
+
+Pour résumer, le simplex est l'ensemble des points actuellement conservés pour trouver l'origine. Il se forme au fur et à mesure des itérations de nos algorithmes et pouvant aussi bien être un simple point qu'une forme complexe. Sa forme la plus évoluée, dépendant de la dimension, sera un tétraèdre en 3D.
+
+\subsubsection{Fonction support}
+La fonction support est une fonction qui va nous permettre de récupérer un point de la DM en les sélectionnant efficacement. En effet, nous le verrons par la suite, cette fonction a pour but de récupérer le point le plus éloigné, en fonction d'un vecteur donné, des deux objets dont on souhaite déterminer la collision.
+
+\subsubsection{GJK - fonctionnement}
+Maintenant que nous avons défini les outils utilisés par GJK, nous allons pouvoir décrire plus amplement son fonctionnement.\\
+
+Pour commencer, cet algorithme va itérer à travers différents points de la DM qui vont permettre de construire et modifier le simplex. Celui-ci pouvant être aussi bien un point, une ligne, un triangle ou encore un tétraèdre selon l'itération. Pour trouver ces points, nous allons avoir besoin d'une direction qui nous permettra d'utiliser notre fonction support.\\
+
+\noindent Prenons les deux cas suivant pour expliquer la méthode et appelons T1 le triangle supérieur et T2 l'autre:
+\begin{figure}[h!]
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/5.png}
+		\caption{GJK collision}
+		\label{fig:GJK collision}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/6.png}
+		\caption{GJK non collision}
+		\label{fig:GJK non collision}
+	\end{subfigure}
+\end{figure}
+
+\noindent Ensuite, considérons comme direction de départ, une droite parallèle à l'axe horizontal. Lors de la recherche d'un nouveau point, pour une direction donnée, nous utiliserons à chaque fois un vecteur ayant cette même direction mais ayant un sens opposé pour chaque forme. Très souvent, le vecteur de départ sera calculé à partir des centres de ces 2 dernières car même si le vecteur peut être quelconque, les centres en donne un plus optimal (en particulier pour des sphères).
+\pagebreak
+
+\noindent À la première itération nous obtenons donc les points suivants pour nos deux exemples:
+\begin{figure}[h!]
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s1-1.png}
+		\caption{GJK collision récupération du 1er point}
+		\label{fig:GJK collision récupération du 1er point}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s1-2.png}
+		\caption{GJK non collision récupération du 1er point}
+		\label{fig:GJK non collision récupération du 1er point}
+	\end{subfigure}
+\end{figure}
+
+\noindent Pour récupérer le $2^{\text{ème}}$ point, il va falloir récupérer un nouveau vecteur. Et pour celui-ci nous allons simplement utiliser le même vecteur qu'au début mais en appliquant un facteur -1. Nous obtenons les points suivants: 
+
+\begin{figure}[h!]
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s2-1.png}
+		\caption{GJK collision récupération du 2ème point}
+		\label{fig:GJK collision récupération du 2ème point}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s2-2.png}
+		\caption{GJK non collision récupération du 2ème point}
+		\label{fig:GJK non collision récupération du 2ème point}
+	\end{subfigure}
+\end{figure}
+
+Avant de continuer, prenons un instant pour détailler et étudier l'introduction de ce nouveau point. Dans notre algorithme, nous allons vérifier la pertinence de l'ajout d'un point à chaque étape. En effet, si le nouveau point ne respecte pas certaines conditions alors l'algorithme permettra de conclure l'absence de collision. 
+
+\begin{figure}[h!]
+	\begin{minipage}{0.6\linewidth}
+		Regardons cela de plus près. Admettons que ce nouveau point (J) soit en réalité de l'autre côté de l'axe vertical en prenant en compte le fait qu'il soit le point de la DM le plus éloigné dans la direction D2. Si nous traçons une droite perpendiculaire à notre direction et passant par J, nous comprenons qu'aucun point ne peut se situer de l'autre côté. Cela veut aussi dire que l'origine ne sera jamais à l'intérieur de notre simplex car il ne pourra jamais avoir de point dans la zone hachurée. Nous pourrons donc immédiatement conclure qu'il n'y a pas de collision. Dans notre algorithme, cela se traduit par le fait que la\textbf{ projection du nouveau point J sur $\vec{D2}$ est inférieure à 0}.
+	\end{minipage}
+	\hfill 
+	\begin{minipage}{0.35\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s3.png}
+		\caption{GJK vérification du nouveau point}
+		\label{fig:GJK vérification du nouveau point}
+	\end{minipage}
+\end{figure}
+
+\noindent Cela sera utilisé tout au long de l'algorithme et permettra donc d'affirmer qu'il n'y a pas de collision.\\
+
+Maintenant que nous avons nos 2 premiers points, nous allons pouvoir dérouler notre algorithme qui va récupérer en boucle, jusqu'à résolution, un nouveau point et une nouvelle direction en fonction de ce que nous détenons déjà.
+Dans notre cas, nous avons 3 cas distincts:
+\begin{itemize}[label=-]
+	\item la ligne (1-Simplex);
+	\item le triangle (2-Simplex);
+	\item le tétraèdre (3-Simplex).
+\end{itemize}
+
+
+Pour récupérer la prochaine direction, étant donné que nous avons une ligne, nous allons rechercher un vecteur perpendiculaire à notre ligne et allant dans le sens vers l'origine. Cela se récupère à l'aide d'un double produit vectoriel:\\
+
+\centerline{$\vec{PV} = \vec{JOrigine} \land \vec{JO}$}
+puis\\
+\centerline{$\vec{d3} = \vec{PV} \land \vec{JOrigine}$}
+\vfill
+\noindent Ici nous avons les points B et C qui sont autant éloignés, ont la même projection sur $\vec{d3}$. Nous pouvons prendre n'importe lequel des deux et cela nous donnera les points M ou I dans la DM. Comme nous pouvons le voir sur l'exemple où il n'y a pas de collision, nous pouvons directement conclure qu'il n'y a pas de collision car le nouveau point ne respecte pas la condition donnée plus haut.
+
+\begin{figure}[h!]
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s4-1.png}
+		\caption{GJK collision récupération du 3ème point}
+		\label{fig:GJK collision récupération du 3ème point}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s4-2.png}
+		\caption{GJK non collision récupération du 3ème point}
+		\label{fig:GJK non collision récupération du 3ème point}
+	\end{subfigure}
+\end{figure}
+
+À partir de maintenant, il ne nous reste plus qu'à rechercher la présence de collision dans le 1er exemple. Nous allons tout d'abord nous concentrer sur la résolution pour des objets 2D. En effet, pour de la 3D, il nous faudrait continuer à récupérer d'autres points pour construire notre tétraèdre et vérifier que celui-ci contient l'origine.\\
+
+\begin{figure}[h!]
+	\begin{minipage}{0.5\linewidth}
+		Nous avons ici 6 zones dans lesquelles nous allons rechercher l'origine. Voyons lesquelles ne peuvent pas la contenir. Assez simplement, nous avons trouvé le point I à partir d'un vecteur perpendiculaire à [OJ] et allant vers l'origine. Ce qui nous permet d'écarter les zones R1, R2 et R3. De plus, si l'origine se trouvait dans R6 alors le point I n'aurait pas été valide car sa projection sur $\vec{d3}$ aurait été inférieure à 0. Cela nous laisse donc pour seul possibilité R4, R5 et l'intérieur du triangle.
+	\end{minipage}
+	\hfill
+	\begin{minipage}{0.45\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s5.png}
+		\caption{GJK identification des zones de recherche de l'origine avec un triangle}
+		\label{fig:GJK identification des zones de recherche de l'origine avec un triangle}
+	\end{minipage}	
+\end{figure}
+
+\noindent Pour déterminer où se situe l'origine, nous allons simplement utiliser les droites (OI) et (IJ). Comme précédemment, nous souhaitons rechercher une nouvelle direction qui va nous permettre de mettre à jour notre simplex. Ces points devant se trouver dans les zones R4 ou R5, nous allons prendre des vecteurs orthogonaux à (OI) et (IJ) et orientés vers l'extérieur. En projetant le dernier point obtenu sur ces vecteurs, nous allons pouvoir déterminer la position de l'origine. \\
+
+\noindent Soit $\vec{V1} = \vec{IO} \land \vec{Iorigine} \land \vec{IO}$  et 
+$\vec{V2} = \vec{IJ} \land \vec{Iorigine} \land \vec{IJ}$
+
+
+\begin{figure}[h!]
+	\begin{minipage}{0.55\linewidth}
+		\begin{itemize}[label=-]
+			\item si $\vec{V1}. \vec{Iorigine} \le 0$ alors l'origine n'est pas dans R4;
+			\item si $\vec{V2}. \vec{Iorigine} \le 0$ alors l'origine n'est pas dans R5;
+			\item si l'origine n'est ni dans R4 ni dans R5 alors elle est à l'intérieur du triangle et donc on peut affirmer la présence d'une collision.
+		\end{itemize}
+	
+	\end{minipage}
+	\hfill
+	\begin{minipage}{0.45\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s6.png}
+		\caption{GJK recherche de l'origine avec triangle}
+		\label{fig:GJK recherche de l'origine avec triangle}
+	\end{minipage}	
+\end{figure}
+\noindent Dans notre cas, on obtient $\vec{V1}. \vec{Iorigine}$ > 0 le nouveau vecteur $\vec{D4}$ est donc $\vec{V1}$
+
+\begin{figure}[h!]
+	\begin{minipage}{0.55\linewidth}
+		En itérant nous finissons par avoir le triangle suivant qui contient l'origine et nous permet donc de conclure qu'il y a bien une collision.
+	\end{minipage}
+	\hfill
+	\begin{minipage}{0.45\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/GJK/s7.png}
+		\caption{GJK fin}
+		\label{fig:GJK fin}
+	\end{minipage}	
+\end{figure}
+
+\noindent Pour des objets en 3 dimensions, il nous aurait fallu récupérer comme direction un vecteur normal à notre face triangulaire et nous aurions obtenu un tétraèdre. Il nous aurait fallu par la suite faire exactement la même chose mais au lieu de prendre la normale d'un segment, nous aurions comparé les normales de chacune des faces dont le sommet est le dernier point ajouté. En effet, la face opposée à ce point ne peut contenir l'origine sinon elle serait d'un côté opposé à ce nouveau et donc il ne serait pas valide.
+
+\pagebreak
+\subsubsection{Détection des collisions continues}
+De l'anglais \textit{continuous collision detection} \citep{Multiple}, la détection des collisions continue va permettre d'aller encore un cran au dessus dans l'analyse du problème mais aussi de sa difficulté aussi bien pour l'analyse que pour l'implémentation. Dans les précédents algorithmes nous avons évoqué des détections pour des objets avec une possible rotation mais immobile. Si l'intervalle de temps entre 2 détections n'est pas suffisamment court par rapport à la vitesse des objets en mouvement alors la collision pourrait ne pas être détectée, ou pire, être détectée au mauvais endroit.\\
+
+Prenons l'exemple des deux balles suivantes se rapprochant l'une de l'autre avec 2 situations différentes: 
+
+\begin{figure}[h!]
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=\linewidth]{Image/Physique/Balls1.png}
+		\caption{Balles, collision attendue}
+		\label{fig:Balles, collision attendue}
+	\end{subfigure}
+	\hfill
+	\begin{subfigure}{0.4\linewidth}
+		\includegraphics[width=1.3\linewidth]{Image/Physique/Balls2.png}
+		\caption{Balles, situations}
+		\label{fig:Balles, situations}
+	\end{subfigure}
+\end{figure}
+
+Dans le cas où l'intervalle de temps est suffisamment petit, aucun problème. La détection de la collision qui donnera suite à des interactions se fera suffisamment tôt pour que chaque balle reparte du bon côté. Cela correspondant à la situation n°1 de la  \autoref{fig:Balles, situations}.
+En revanche, si l'intervalle de temps est trop long, on pourrait se retrouver dans la situation n°2 de la  \autoref{fig:Balles, situations}, où la détection de la collision se fait trop tardivement et impliquera ainsi des erreurs en chaine.\\
+
+Plutôt que de vérifier si des objets se touchent à un instant précis, cette méthode examine les trajectoires des objets sur une série d'intervalles de temps très courts. Elle permet ainsi d'analyser et de déterminer, et ce même si l'intervalle de temps donné est long, si oui et quand les objets vont entrer en collision en suivant leurs mouvements. Cette méthode est donc plus efficace mais aussi plus complexe et coûteuse en calcul.
+\pagebreak
+
+\subsubsection{Gestion et optimisation}
+Une scène, peut comporter une multitude d'objets qui peuvent être plus ou moins éloignés. Visuellement nous pourrions très vite définir que certains objets, étant très éloignés, n'entrent pas en collision. Il peut donc paraitre inefficace de tester toutes les collisions possibles 2 à 2 pour chacun de nos objets présents. C'est pourquoi nous avons cherché un moyen d'optimiser le nombre de détections à faire.
+\paragraph{Sweep \& prunes} \citep{Multiple} est un algorithme qui va répondre à ce problème de manière assez simple et efficace. Il fonctionne comme suit: on commence par trier par ordre croissant de leur position (en réalité la valeur minimale des projections de leurs points) selon un axe quelconque nos différents objets.\\
+On construit ensuite deux listes : une liste que l'on nommera active et une liste des collisions probables. En itérant sur les différents objets, nous allons à chaque tour de boucle, comparer l'objet actuel avec ceux dans la liste active. Si un élément de la liste active a une probable collision (intersection sur cet axe) alors on ajoute cette paire à la liste des collisions probables. S'il n'y a pas d'intersection sur cet axe, alors il n'y a pas de collision (preuve du théorème de SAT). Ce dernier est donc retiré de la liste active. En effet, étant trié dans l'ordre, s'il n'a pas de collision avec l'objet actuel il n'en aura pas avec les suivants. En fin de boucle nous ajoutons cet objet à la liste active et itérons avec les autres objets.\\
+
+
+Lors de nos tests, nous avons pu observer que cette optimisation nous a permis d'effectuer les calculs, en s'appuyant sur un nombre de collision 10 000 et sur le fait qu'il n'y ai pas de collision, jusqu'à 1 545 fois plus vite ! À titre de comparaison cela veut dire que pour un calcul qui nous prendrait 0,1 secondes, ce même calcul prendrait 154,5 secondes soit 2,6 minutes sans cette optimisation. Cela causerait un gros décalage avec la réalité et rendrait tout jeux injouable.\\
+Pour cette comparaison, se baser sur des tests où il n'y a pas de collision est plus pertinent car un temps comprenant des collisions cache des calculs de résolution Les algorithmes de détection étant les mêmes, les tests sans collision comparent de manière plus efficace le nombre de détections effectuées.
+
+
+\begin{table}[H]
+	\centering
+	\rowcolors{2}{gray!10}{gray!40}
+	\begin{tabular}{|l|l|l|l|}
+		\hline
+		Utilisation de Sweep and Prunes & $n$ = 100	& $n$ = 1 000 & $n$ = 10 000\\ \hline
+		Sans et que des collisions & 5,9 ms & 366 ms & 27 662,6 ms\\
+		Sans et 0 collision & 2,8 ms & 276,5 ms & 27 208,7 ms\\
+		Avec et que des collisions & 3,4 ms	& 70,5 ms & 616,5 ms\\
+		Avec et 0 collision & 0,1 ms	& 1,2 ms & 17,6 ms\\
+		\hline
+	\end{tabular}
+	\caption{Comparaison Sweep And Prune}
+	\label{tab:tabOptimisation}
+\end{table}
+
+
+\newpage
+
+\subsection{Résolution}
+Après avoir détecté les collisions, il faut maintenant les résoudre. Nous savons que 2 objets entrent en contact mais que faire ? Sont-ils censés être fixes ou sont-ils tous les 2 mobiles ? Et s'ils sont mobiles, dans quelle direction devront-ils aller ? Si nous sommes en capacité de détecter une collision, sommes-nous capable de savoir quelle surface est entrée en collision et donc la normale à cette surface nous permettant de faire \og rebondir \fg notre objet ?\\
+
+\subsubsection{Expending Polytope Algorithm}
+Expending Polytope Algorithm (\textbf{EPA}) \citep{EPA} ou, Algorithme de Polytope en Expansion en français, va nous permettre de répondre à cette question à l'aide du simplex obtenu par GJK précédemment. Dans notre cas d'étude nous allons nous concentrer sur la 3D uniquement. La forme la plus évoluée sera donc un tétraèdre.\\
+Cet algorithme peut être résumé en 4 étapes:
+
+\begin{itemize}[label=-]
+	\item initialisation: le simplex obtenu de GJK est utilisé comme point de départ pour EPA. Celui-ci élargit progressivement ce simplex pour mieux définir la région de collision réelle;
+	\item expension du polytope: le polytope se développe lorsque EPA augmente la taille du simplex en ajoutant des points à sa structure, créant ainsi un polytope. L'algorithme identifie le point du polytope le plus proche de la surface de collision réelle à chaque étape;
+	\item calcul de la profondeur de pénétration : en continuant à étendre le polytope, EPA converge vers la vraie forme de la région de collision. À mesure que cela se produit, l'algorithme calcule la profondeur de pénétration, qui représente la distance par laquelle les objets sont enfoncés l'un dans l'autre;
+	\item détermination de la normale de la collision : EPA détermine également la normale à la surface de collision, fournissant ainsi la direction perpendiculaire à cette surface.
+	
+\end{itemize}
+
+En résumé EPA va essayer de trouver la droite, intérieure à notre DM, la plus proche de l'origine. À partir de celle-ci nous pourrons alors estimer la normale de la surface de collision. Une visualisation est disponible \href{https://winter.dev/articles/epa-algorithm}{ici: https://winter.dev/articles/epa-algorithm} \citep{demoEPA}.\\
+
+Après avoir obtenu des informations concernant la position et la normale au plan de collision nous pourrons finalement déterminer et mettre à jour la trajectoire de nos objets. 
+\pagebreak
+
+\subsection{Forces}
+Pour que cela soit réaliste, il nous faut pouvoir déterminer les différentes forces qui agissent sur un objet, qu'elles soient dues à des interactions avec d'autres objets ou simplement définies à leur création comme par exemple la gravité. Celles-ci nous permettront de faire évoluer les différents objets au cours du temps.
+
+\subsubsection{Équations de mouvement}
+
+Dans notre cas d'étude, nous n'aurons que des accélérations constantes et donc des mouvements rectiligne uniformément accélérés. Il nous suffira donc d'utiliser les formules suivante pour connaitre, mettre à jour, la vitesse et la position au cours du temps. Elles sont obtenues de la façon suivante:
+
+
+\begin{align*}
+	v(t) = \int a(t) \, dt = \int a \, dt = at + v_0
+\end{align*}
+
+\begin{align*}
+	p(t) = \int v(t) \, dt =\int (at + v_0) \, dt = \frac{1}{2}at^2 + v_0t + p_0
+\end{align*}
+
+où $v_0$ (resp. $p_0$) représente la vitesse (resp. position) initiale.\\
+
+En pratique, l'accélération d'un objet peut varier mais ces formules restent valables. En effet, les calculs sont effectués à chaque intervalle de temps, mettant à jour les positions et les vitesses. Nous n'avons pas besoin d'avoir de formule générale décrivant l'ensemble des mouvements d'un objet ni d'aller dans le passé et y récupérer son historique. Il nous suffit donc de connaitre la valeur de son accélération et effectuer ces calculs.
+
+\subsubsection{Quantité de mouvement}
+Lorsque 2 objets en mouvement entrent en collision, nous allons avoir un traitement particulier en utilisant la $3^{\text{ème}}$ loi de Newton. Cela nous permettra de facilement évaluer les nouvelles vitesses et trajectoires. Ce cas n'étant pas utilisé avec des objets fixes étant donné que cela ne peut représenter la réelle physique (par exemple le sol est un simple quadrilatère et non la terre avec une masse gigantesque).\\
+\noindent Les équations utilisées seront les suivantes \citep{force}:\\
+
+\noindent\underline{Conservation de l'énergie cinétique}:\\
+
+\centerline{$\frac{1}{2}m_1v_{1i}^2 + \frac{1}{2}m_2v_{2i}^2 = \frac{1}{2}m_1v_{1f}^2 + \frac{1}{2}m_2v_{2f}^2$}
+
+\noindent\underline{Conservation de la quantité de mouvement}: \\
+
+\centerline{$m_1v_{1i} + m_2v_{2i} = m_1v_{1f} + m_2v_{2f}$}
+
+\noindent avec $m$ la masse en kg, $v_{i}$ vitesse initiale et $v_{f}$ vitesse finale en $m.s^{-1}$.\\
+
+
+\noindent En 3D, ces deux équations nous permettront de mettre à jour les vecteurs vitesse de nos deux objets:\\
+
+$v_{1f} = \frac{m_1 - m_2}{m_1 + m_2} \cdot v_{1i} + \frac{2m_2}{m_1 + m_2} \cdot v_{2i}$
+
+$v_{2f} = \frac{2m_1}{m_1 + m_2} \cdot v_{1i} - \frac{m_1 - m_2}{m_1 + m_2} \cdot v_{2i}$
+
+
+\subsubsection{Chocs}
+Lorsque des collisions surviennent, les objets perdent une partie de leur énergie et se déforment. Ces pertes dépendent d'une multitude de facteur dont les matières des composants en contact. Pour faciliter cette partie, nous avons décidé de ne pas prendre en considération cela pour des chocs entre 2 objets en mouvement. En revanche, lors d'un choc avec un objet fixe (sol par exemple) nous appliquons un coefficient compris entre 0 et 1 qui permettra de simuler cette perte d'énergie, la valeur maximale correspondant à un choc élastique (donc sans perte d'énergie).

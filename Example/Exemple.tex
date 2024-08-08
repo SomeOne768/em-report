@@ -1,0 +1,146 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[francais]{babel}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{lipsum}
+\usepackage{enumitem}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage[left=3cm,right=2cm,top=2.5cm,bottom=2.5cm]{geometry}
+\usepackage{hyperref}
+
+\title{Rapport d'élève ingénieur\\
+	Projet de 3ème année\\
+	Filière 1 et 5 : ??? et Réseaux et sécurité informatique\\
+	\textbf{Développement d'un moteur de jeu}}
+\author{Présenté par: \textbf{AntoNain DEVIDAL et Abdeljalil ZOGHLAMI}}
+\date{\today}
+
+
+\begin{document}
+	
+	\begin{figure}[t]
+		\centering
+		\begin{tabular}{c@{\hspace{60mm}}c}
+			\includegraphics[width=50mm]{Image/Logo_ISIMA_INP.png}
+		\end{tabular}
+	\end{figure}
+	
+	
+	
+	\maketitle
+	
+	
+	\thispagestyle{empty}
+	
+	\vfill 
+	\noindent Tuteur de projet: \textbf{PEREIDA Alexis}
+	\hfill %\hspace{0pt}
+	XX/03/2024
+	\begin{flushright}
+		Durée: 240 heures
+	\end{flushright}
+	Campus des Cézeaux. 1 rue de la Chebarde. TSA,60125. 63178 Aubière CEDEX
+	
+	\newpage
+
+	\tableofcontents
+	\pagebreak
+	
+	\section{Algorithme}
+			
+		\begin{algorithm}[H]
+			\caption{Validation croisée}
+			\label{algo:cross_validation}
+			\begin{algorithmic}[1]
+				\Require{$X$: ensemble de données, $K$: nombre de plis}
+				\Ensure{Performance du modèle}
+				\State $S \gets$ Diviser $X$ en $K$ plis de taille égale
+				\State $performance\_totale \gets 0$
+				\For{$i \gets 1$ to $K$}
+				\State $X_{\text{train}} \gets X \setminus S[i]$
+				\State $X_{\text{test}} \gets S[i]$
+				\State Entraîner le modèle sur $X_{\text{train}}$
+				\State Évaluer la performance du modèle sur $X_{\text{test}}$
+				\State $performance\_totale \gets performance\_totale +$ performance du modèle
+				\EndFor
+				\State $performance\_moyenne \gets \frac{performance\_totale}{K}$
+				\State \textbf{return} $performance\_moyenne$
+			\end{algorithmic}
+		\end{algorithm}
+		
+		% ou alors:		
+		%\usepackage[ruled,vlined, french]{algorithm2e}
+		%\begin{algorithm}[H]
+		%    \SetKwInput{KwInOut}{Input-Output}%
+		%    \KwIn{Un graphe de tâches avec durées.}%
+		%    \KwOut{La fonction de rang $r$}%
+		%    \BlankLine%
+		%    \ForAll{$u\in T$}%
+		%    {$\alpha(u):=|N^-(u)|$\;}%
+		%    $i:=0$\;%
+		%    $S_{0}:=\{debut\}$ \tcp*[h]{Le rang $0$ est réduit à $debut$}\;%
+		%    \While{$S_{i}\neq \emptyset$}%
+		%    {$S_{i+1}:=\emptyset$\;%
+			%        \ForAll{$u\in S_{i}$}%
+			%        {$r(u):=i$\;%
+				%            \ForAll{$v\in N^+(u)$}%
+				%            {$\alpha(v):=\alpha(v)-1$\;%
+					%                \If{$\alpha(v)=0$}%
+					%                {$S_{i+1}:=S_{i+1}\cup \{v\}$\;}%
+					%            }%
+				%        }%
+			%        $i:=i+1$\;%
+			%    }%
+		%    \Return{$r$}%
+		%    \caption{Calcul du rang des tâches.}%
+		%    \label{Algo:Rang-DAG}%
+		%\end{algorithm}
+		
+	\section{Maths}
+		
+		\[
+		L_{\log}(1, p) = -\log(p)
+		\]
+		
+		et cette fonction atteint une valeur proche de l'infini lorsque la probabilité $p$ se rapproche de zéro :
+		
+		\[
+		L_{\log}(1, p) \to +\infty \quad \text{lorsque} \quad p \to 0
+		\]
+		
+		$\sum_{0}^{n}$ $x^n$
+		$\sum_{i=0}^{n}$ $x_i$
+		
+		
+	\section{Image}
+	%!h pour être sûr du positionnement
+		\subsection{Forcer positionnement}
+		\begin{figure}[!h]			
+			\centering{\includegraphics[height=30mm]{Image/Logo_ISIMA_INP.png}}
+		\end{figure}
+		
+		\subsection{en haut d'une page}
+		Nécessite de jouer avec des 'pagebreak / newpage' parce que si pas assez de place, placement page suivante
+		\begin{figure}[t]
+			\includegraphics[height=30mm]{Image/Logo_ISIMA_INP.png}
+			\hfill
+			\includegraphics[height=30mm]{Image/Logo_ISIMA_INP.png}
+			\\
+			
+			\centering{\includegraphics[height=30mm]{Image/Logo_ISIMA_INP.png}}
+		\end{figure}
+		
+	\section{Ressources}
+	\paragraph{Dexetify} : https://detexify.kirelabs.org/classify.html, permet de dessiner à la main le symbole que l'on recherche pour ensuite avoir son 'code' LaTeX.
+	\paragraph{ChatGPT} : si une tâche ne demande pas d'intelligence comme par exemple demander à ajouter '\%' à chaque début de ligne. Une simple façon de savoir s'il sera utile: est-ce dans les cordes d'un utilisateur Mac ?
+
+\end{document}
